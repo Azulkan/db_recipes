@@ -1,0 +1,576 @@
+\documentclass[a4paper,10pt]{report}
+\usepackage{fullpage}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{amsmath}
+\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage{graphicx}
+\usepackage{amssymb}
+
+\title{PROJET BD2}
+\date{2014-2015}
+\author{Paul \bsc{Selle} - Clara \bsc{Gainon de Forsan de Gabriac}}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\chapter{Introduction}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+Dans le cadre de l'\bsc{ec bd2}, nous avons conçu et implémenté une base de données (et son interface utilisateur) nous permettant de gérer des recettes de cuisine ainsi que des invitations à dîner. Pour se faire, nous avons utilisé le \bsc{sql} et le \bsc{sql} embarqué, couplé au langage \bsc{c}.\\
+
+Le présent rapport a pour but d'exposer et d'expliquer la démarche que nous avons adoptée afin de réaliser ce projet.
+Il est divisé en deux grandes parties : ce qui a été fait, et ce qui ne l'a pas été. Nous verrons d'abord quels choix ont été faits et quelles techniques ont été utilisées pour réaliser le projet, puis nous expliquerons ce que nous aurions aimé faire  - pour répondre parfaitement au cahier des charges du projet ou en plus de qui était demandé - pour rendre notre application plus élaborée et efficace.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\chapter{Ce qui a été fait}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% --------------------------------------------------------------------------------------------------------------------------------------
+\section{Passage E-A vers relationnel}
+% --------------------------------------------------------------------------------------------------------------------------------------
+% ......................................................................................................................................
+\subsection{Explications (détail des étapes)}
+% ......................................................................................................................................
+
+\begin{enumerate}
+ \item Cas entité(s) faible(s) :
+ Il n'y a pas d'entités faibles dans le schéma E-A donné.
+ \item Cas entité(s) non faible(s) :
+ 	\begin{itemize}
+ 	\item \bsc{Personne}
+ 	\item \bsc{Rangement}
+ 	\item \bsc{Recette}
+ 	\item \bsc{Ingrédient}
+	\end{itemize}
+ \item Cardinalité(s) 1-1 :
+ 	\begin{itemize}
+ 	\item \bsc{Recette}
+ 	\item \bsc{Ranger}
+ 	\item \bsc{Rangement}. \\
+ 	\textit{Nota : l'association \bsc{Ranger} n'ayant pas d'attribut, nous n'avons pas eu besoin d'appliquer le cas 3-4 vu en cours.}
+	\end{itemize}
+ \item Autre(s) Cardinalité(s) 
+ \begin{itemize}
+ 	\item \bsc{Realiser\_pour}
+ 	\item \bsc{Contenir}
+	\end{itemize}
+ \item Attribut(s) multi-valué(s) :
+ Il n'y a pas d'attributs multi-valués dans le schéma E-A donné.
+ \item Relation(s) n-aire(s) :
+Il n'y a pas de relation n-aire dans le schéma E-A donné.
+\end{enumerate}
+
+
+% ......................................................................................................................................
+\subsection{Ensemble complet des relations de la base}
+% ......................................................................................................................................
+
+\subsubsection{Tables}
+
+\begin{itemize}
+\item \textcolor{cyan}{\bsc{Personne} (\textbf{idPers}, telephone, type\_lien, nom)} 
+\item \textcolor{MidnightBlue}{\bsc{Rangement} (\textbf{idRang}, type , description, date, nom)} 
+\item \textcolor{LimeGreen}{\bsc{Recette} (\textbf{idRec}, type, description, titre, temps, note)} 
+\item \textcolor{BrickRed}{\bsc{Ingredient} (\textbf{nom,} unité, description, prix)}
+\item \bsc{Realiser\_pour} (\textbf{\textcolor{cyan}{idPers}, \textcolor{LimeGreen}{idRec}}, evenement, date) 
+\item \bsc{Contenir} (\textbf{\textcolor{LimeGreen}{idRec}, \textcolor{BrickRed}{nom}}, quantite, unite)
+\item \bsc{Ranger} (\textbf{\textcolor{LimeGreen}{idRec}, \textcolor{MidnightBlue}{nom}})
+
+\end{itemize}
+
+\subsubsection{Vues}
+\begin{itemize}
+\item \bsc{Liste\_evaluation\_recette} (\textcolor{LimeGreen}{type, titre, temps,} appreciation)
+
+
+\item \bsc{Liste\_a\_inviter} (\textcolor{cyan}{nom}, date\_derniere\_invit, aInviter, nbInvit)
+
+    
+    
+\end{itemize}
+
+% --------------------------------------------------------------------------------------------------------------------------------------
+\section{Choix}
+% --------------------------------------------------------------------------------------------------------------------------------------
+
+% ......................................................................................................................................
+\subsection{Choix des clés}
+% ......................................................................................................................................
+
+ \subsubsection{Relation \bsc{Personne}}
+ 	Clé choisie : idPers. 
+ 	
+	C'est un identifiant unique puisqu'il est de type \bsc{Serial} (entier d'une séquence non répétitive), c'est donc un choix idéal de clé pour la relation. Le numéro de téléphone aurait également pu convenir, mais paraissait moins intuitif.\\
+	
+ \subsubsection{Relation \bsc{Rangement}}
+ 	Clé chosie : idRang.
+ 	
+	C'est un identifiant unique puisqu'il est de type \bsc{Serial} (entier d'une séquence non répétitive), c'est donc un choix idéal de clé pour la relation. Nous n'avons pensé à aucune autre clé concurrente car les attributs type, date et nom peuvent être les mêmes pour différents rangements (ex : on peut avoir 2 magazines parus le même jour, etc).\\
+	 
+ \subsubsection{Relation \bsc{Recette}}
+ 	Clé chosie : idRecette.
+ 	
+	Nous avons choisis cet attribut pour les mêmes raisons que celles citées pour les relations précédentes, idem en ce qui concerne les autres attributs, qui ne permettent pas seuls de définir un tuple de façon unique.
+	
+ \subsubsection{Relation \bsc{Ingredient}}
+ 	 Clé choisie : nom.
+ 	 
+	 Un ingrédient est reconnaissable par son nom, alors que plusieurs ingrédients différents peuvent avoir le même prix, ou la même unité. Quant à la description, ce n'était pas assez fiable ; on imagine également que l'utilisateur peut souhaiter ne pas en préciser.\\
+	 
+ \subsubsection{Relation \bsc{Realiser\_pour}}
+ 	Clé choisie : idPers, idRec.
+ 	
+	La relation exprime le lien entre les personnes et les repas qui leur ont déjà été servis. Pour cela, et parce que idPers et idRec sont deux clefs étrangères qui permettent de lier Recette et Personne, il nous a semblé approprié de définir \textbf{idPers, idRec} comme clé de cette relation.
+	
+ \subsubsection{Relation \bsc{Contenir}}
+	Clé choisie : nom, idRec.
+	
+	Comme pour la relation précédente, nous avons choisi 2 clés étrangères, et les autres attributs ne pouvaient pas être clé (ou alors à trois, ce qui les disqualifie).
+	
+ \subsubsection{Relation \bsc{Ranger}}
+ 	Clé choisie :  nom, idRec.
+ 	
+	Ce sont les seuls attributs de la relation, et séparément, ils ne pouvaient pas être clé de la relation.
+
+% ......................................................................................................................................
+\subsection{Choix des contraintes}
+% ......................................................................................................................................
+Nous avons établi une contrainte d'unicité et de non nullité sur les clés de toutes les relations, afin d'être assurés qu'elles respectent la définition même d'une clé de relation.
+
+ \subsubsection{Relation \bsc{Personne}}
+ 
+ \begin{itemize}
+ 	
+	\item \textbf{Contraintes Intra-Relation} :
+		 \begin{itemize}
+		 	\item Non nullité de l'attribut nom, parce qu'un nombre seul (idPers) n'est pas suffisamment pratique pour définir une personne.
+			\item Taille de l'attribut Nom restreinte à 50 caractères, parce qu'il faut veiller à ce que les données ne prennent pas trop de place inutilement, puisque même le nom de famille de Clara rentre en 50 caractères.
+			\item Taille du numéro de téléphone : 20 caractères. Les numéros français sont effectivement tous composés de 10 caractères, mais il n'en n'est pas de même pour les numéros étrangers.
+			\item Taille de typeLien restreinte à 20 caractères, sachant que le typeLien le plus long n'excède pas 15 caractères. Nous avons arrondi au dessus pour être sur d'avoir de la place sans gaspiller inutilement de la mémoire.
+			\item Domaine de l'attribut typeLien : ('Ami', 'Famille', 'Collegue'). \\
+			
+		 \end{itemize}
+ 	\item  \textbf{Contraintes Inter-Relation} :
+
+Pas de contraintes inter-relation.
+
+ 
+ \end{itemize}
+	
+ \subsubsection{Relation \bsc{Rangement}}
+
+\begin{itemize}
+ 	
+	\item \textbf{Contraintes Intra-Relation} :
+	
+		\begin{itemize}
+			\item Taille de type restreinte à 20 caractères, sachant que le type le plus long n'excède pas 15 caractères. Nous avons arrondi au dessus pour être sur d'avoir de la place sans gaspiller inutilement de la mémoire. 
+			\item Domaine de l'attribut type limité à : ('Manuscrit', 'Livre', 'Url', 'Magazine'). 
+			\item Taille de Description restreinte à 200 caractères. À peine plus longue qu'un tweet, la description sera donc à la fois concise et explicite. 
+			\item Taille du nom du \bsc{Rangement} restreinte à 50 caractères, Pour pouvoir être précis sans prendre trop de place.\\
+		 \end{itemize}
+ 
+ 	\item  \textbf{Contraintes Inter-Relation} :
+ 
+Pas de contraintes inter-relation.
+
+  
+ 
+ \end{itemize}
+	 
+ \subsubsection{Relation \bsc{Recette}}
+ 
+  \begin{itemize}
+ 	
+	\item \textbf{Contraintes Intra-Relation} :
+	
+		\begin{itemize}
+			\item Taille du titre restreinte à 50 caractères. 
+			\item Taille de l'attribut type restreint à 20 caractères, sachant que le type le plus long n'excède pas 15 caractères. Nous avons arrondi au dessus pour être sur d'avoir de la place sans prendre trop de mémoire.
+			\item Domaine l'attribut type : ('Amuse-gueule', 'Entree', 'Plat', 'Dessert'). 
+			\item Domaine des attributs tempsPreparation, tempsCuisson et note : Entiers Naturels. Pour les deux premiers attributs, nous avons pensé qu'une précision à la minute près serait suffisante et on ne peut évidemment pas avoir une temps de cuisson ou de préparation négatif. En ce qui concerne la note, nous avons simplement respecté l'énoncé.\\
+		 \end{itemize}
+  
+ 	\item  \textbf{Contraintes Inter-Relation} :
+ 
+ 
+Pas de contraintes inter-relation.
+
+ \end{itemize}
+ 		
+ \subsubsection{Relation \bsc{Ingrédient}}
+ 
+  \begin{itemize}
+ 	
+	\item \textbf{Contraintes Intra-Relation} :
+		\begin{itemize}
+			\item Taille de l'attribut unité restreinte à 20 caractères sachant que le type le plus long n'excède pas 15 caractères. Nous avons arrondi au dessus pour être sur d'avoir de la place sans prendre trop de mémoire.
+			\item Domaine de l'attribut évènement : ('unite', 'litre', '100 grammes', 'kilo').
+			\item Domaine du prix : $\mathbb{N}$.\\
+		 \end{itemize}
+		 
+ 	\item  \textbf{Contraintes Inter-Relation} :
+ 	
+ Pas de contraintes inter-relation.
+ 
+ \end{itemize}
+ 	
+ \subsubsection{Relation \bsc{Realiser\_pour}}
+ 
+  \begin{itemize}
+ 	
+	\item \textbf{Contraintes Intra-Relation} :
+	 	\begin{itemize}
+			\item Taille de l'attribut evenement restreinte à 20 caractères, sachant que l'événement le plus long n'excède pas 15 caractères. Nous avons arrondi au dessus pour être sur d'avoir de la place sans prendre trop de mémoire.
+			\item Domaine d'événement : (\bsc{null}, 'Anniversaire', 'Fête', 'Noël', 'Nouvel-An').
+			\item Non nullité de l'attribut date.\\
+		 \end{itemize}
+		 
+		 
+ 	\item  \textbf{Contraintes Inter-Relation} :
+ 			\begin{itemize}
+			\item Référentielle : les attributs idPers et idRec sont des clés étrangères référençant respectivement les tables \bsc{personne} et \bsc{recette}.
+		 \end{itemize}
+ \end{itemize}
+ 	
+
+ \subsubsection{Relation \bsc{Contenir}}
+ 
+  \begin{itemize}
+ 	
+	\item \textbf{Contraintes Intra-Relation} :
+	
+	 	\begin{itemize}
+			\item  Taille de l'attribut unite limitée à 20 caractères, pour les raisons énoncées précédemment.
+			\item Domain de l'attribut unite : ('unite', 'litre', '100 grammes', 'kilo') 
+			\item Domaine de l'attribut quantité : $\mathbb{R^+}$.\\
+		 \end{itemize}
+ 	\item  \textbf{Contraintes Inter-Relation} :
+ 	
+ 	 	\begin{itemize}
+			\item Référentielle : les attributs nom et idRec sont des clés étrangères référençant respectivement les tables \bsc{Ingredients} et \bsc{Recette}.
+		 \end{itemize}
+ 
+ \end{itemize}
+	
+	
+ \subsubsection{Relation \bsc{Ranger}}
+ 
+  \begin{itemize}
+ 	
+	\item \textbf{Contraintes Intra-Relation} :
+
+		Pas de contrainte intra-relation.\\
+
+ 
+ 	\item  \textbf{Contraintes Inter-Relation} :
+ 		\begin{itemize}
+			\item Référentielle : les attributs idRang et idRec sont des clés étrangères référençant respectivement les tables \bsc{rangement} et \bsc{recette}.
+		 \end{itemize}
+ 
+ 
+ \end{itemize}
+ 
+
+% ......................................................................................................................................
+\subsection{Choix des index}
+% ......................................................................................................................................
+
+Etant précisé que l'on veut pouvoir rechercher des recettes selon la première lettre de leur titre, nous avons logiquement décidé de placer un index sur l'attribut titre de la relation \bsc{Recette}.
+
+De même, nous avons placé un index sur l'attribut typeLien de la relation \bsc{Personne} puisque la recherche d’une personne est souvent effectuée en se basant sur le type de lien.
+
+% ......................................................................................................................................
+\subsection{Autre choix}
+% ......................................................................................................................................
+\begin{itemize}
+\item \textbf{Contraintes sur les dates : } Nous avons choisi de ne pas mettre de contrainte sur les dates de la tables \bsc{realiser}\_\bsc{pour} pour que les dates rentrées soient obligatoirement postérieures à la date d'aujourd'hui, car nous ne savions pas gérer le fait que les tuples à insérer dataient évidemment d'avant la création de notre base et nous avons voulu éviter ce conflit.
+\end{itemize}
+
+% --------------------------------------------------------------------------------------------------------------------------------------
+\section{Explications sur la réalisation des fonctionnalités}
+% --------------------------------------------------------------------------------------------------------------------------------------
+\textit{Dans cette section nous expliciterons la méthode de résolution pour chaque fonctionnalité implémentée. Attention : les algorithmes qui vont suivre servent à illustrer la méthode utilisée, mais ne correspondent pas à ceux présents dans l'application. Quelques facilités d'écriture ont été décidées, notamment :
+	\begin{itemize}
+		\item l'omission des tailles des tableaux.
+		\item l'omission de la préparation/ dé-allocation des objets de requêtes (exécution seule).
+		\item la plupart des instructions \bsc{SQL} ont été remplacées par une brève description de leur fonction. 
+		\item l'omission des commits.
+		\item ...\\
+	\end{itemize}
+}
+
+% ......................................................................................................................................
+\subsection{Ajout d'une personne}
+% ......................................................................................................................................
+
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Chaine} typeLien, nom, telephone\\
+	\indent\indent\textbf{Chaine} requete = "INSERT INTO PERSONNE (idPers, nom, typeLien, telephone) VALUES \indent\indent(DEFAULT, ?, ?, ?);"\\
+
+\textbf{Début}\\
+	\indent\indent\textbf{lire}(nom)\\
+	\indent\indent\textbf{lire}(typeLien)\\
+	\indent\indent\textbf{lire}(telephone)\\
+	\indent\indent\textbf{executer} requete \textbf{en utilisant} \bsc{Default}, nom, typeLien, telephone\\
+\indent\textbf{Fin}\\
+
+L'algorithme n'est pas plus compliqué que cela : aucune structure de contrôle n'a du être placée, puisque les contraintes d'intégrité sont vérifiées par le \bsc{sgbd}.
+%
+
+% ......................................................................................................................................
+\subsection{Ajout d'une recette}
+% ......................................................................................................................................
+
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Chaine} titre, type, description, nomIngredient, unite\\
+	\indent\indent\textbf{Caractère} continuer\\
+	\indent\indent\textbf{Réel} quantite\\
+	\indent\indent\textbf{Naturel} tpsPrep, tpsCuis, note, idRecette, nb=0 \\
+	\indent\indent\textbf{Chaine} requete1 = "INSERT INTO RECETTE (idRec, titre, type, description, tempsPrepara-\indent\indent tion, tempsCuisson, note) VALUES (DEFAULT, ?, ?, ?, ?, ?, ?);"\\
+	\indent\indent\textbf{Chaine} requete2 = "INSERT INTO CONTENIR (quantite, unite, nom, idRec) VALUES (?, ?, ?, ?);"\\
+
+\textbf{Début}\\
+	\indent\indent\textbf{lire}(titre)\\
+	\indent\indent\textbf{lire}(type)\\
+	\indent\indent\textbf{lire}(description)\\
+	\indent\indent\textbf{lire}(tpsPrep)\\
+	\indent\indent\textbf{lire}(tpsCuis)\\
+	\indent\indent\textbf{lire}(note)\\
+	\indent\indent\textbf{executer} requete1 \textbf{en utilisant} \bsc{Default}, titre, type, description, tpsPrep, tpsCuis, note\\
+	\indent\indent\textbf{ecrire}("Ajout des ingrédients...")\\
+	\indent\indent\bsc{SQL} : On recupere l'idRec de la recette juste ajoutée dans la variable idRecette.\\
+	\indent\indent\textbf{Tant que}(continuer != n) \textbf{faire}\\
+		\indent\indent\indent\textbf{lire}(nomIngredient)\\
+		\indent\indent\indent\textbf{lire}(unite)\\
+		\indent\indent\indent\textbf{lire}(quantite)\\
+		\indent\indent\indent \textbf{Si} l'ingrédient n'existe pas encore \textbf{alors}\\
+			\indent\indent\indent\indent ajouterIngredient(nomIngredient, unite) \\
+		\indent\indent\indent \textbf{Finsi} \\
+		\indent\indent\indent\textbf{ecrire}("Nouvel ingrédient ? (o/n) : ")\\
+		\indent\indent\indent\textbf{lire}(continuer)\\
+		\indent\indent\indent\textbf{executer} requete2 \textbf{en utilisant} quantite, unite, nomIngredient, idRecette\\
+	\indent\indent\textbf{Fin tant que}\\
+	\indent\indent continuer = 'y'\\
+	\indent\textbf{Fin}\\
+	
+	On voit donc que nous avons dû implémenter une fonction supplémentaire - ajouterIngredient - puisque si la recette juste ajoutée contient un ingrédient inconnu, il sera impossible d'ajouter le tuple qui va bien dans \bsc{Contenir} (dans cette relation le nom de l'ingrédient fait partie de la clé !). Cette fonction à le même fonctionnement (simple) qu'ajouterPersonne, c'est pourquoi nous ne l'expliciterons pas ici.\\
+
+% ......................................................................................................................................
+\subsection{Suppression d'une recette}
+% ......................................................................................................................................
+
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Naturel} id, nb\\
+	\indent\indent\textbf{Chaine} requete = "DELETE FROM RECETTE WHERE idRec = ?;"\\
+
+\textbf{Début}\\
+	\indent\indent \textbf{ecrire}("ID de la recette à supprimer : ")\\
+	\indent\indent \bsc{SQL} : On compte le nombre de recettes ayant cet ID dans id\\
+	\indent\indent /* Erreur si la recette n'existe pas */ \\
+	\indent\indent \textbf{Si} nb = 0 \textbf{alors}\\
+		\indent\indent\indent \textbf{ecrire}("Recette inexistante !")\\
+	\indent\indent \textbf{Sinon} \\
+		\indent\indent\indent\textbf{executer} requete \textbf{en utilisant} id \\
+\indent\textbf{Fin}\\
+	
+% ......................................................................................................................................
+\subsection{Affichage liste des ingrédients d'une recette}
+% ......................................................................................................................................
+
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Naturel} idRecette, nb\\
+	\indent\indent\textbf{Chaine} nomIngredient \\
+	\indent\indent\textbf{Chaine} requete = "SELECT nom FROM CONTENIR WHERE idrec = :idRecette;"\\
+
+\textbf{Début}\\
+	\indent\indent \textbf{ecrire}("ID de la recette à supprimer : ")\\
+	\indent\indent \textbf{lire}(idRecette)\\
+	\indent\indent \bsc{SQL} : On déclare un curseur pour requete (break si on rencontre un tuple \bsc{null})\\
+	\indent\indent \textbf{ecrire}("Ingredients de la recette" + idRecette + " : ")\\
+	\indent\indent\textbf{Tant que}(vrai) \textbf{faire}\\
+		\indent\indent\indent \bsc{SQL} : On avance le curseur et sauvegarde la valeur dans nomIngrédient	\\
+		\indent\indent\indent \textbf{ecrire}(nomIngredient)\\
+	\indent\indent\textbf{Fin tant que}\\
+\indent\textbf{Fin}\\
+
+
+% ......................................................................................................................................
+\subsection{Affichage de la liste des recettes évaluées}
+% ......................................................................................................................................
+
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Chaine} nomRecette, evalRecette \\
+	\indent\indent\textbf{Chaine} requete = "SELECT titre, appreciation FROM LISTE\_EVALUATION\_RECETTE;"\\
+	
+\textbf{Début}\\
+	\indent\indent \textbf{ecrire}("Liste d'appreciation des recettes : ")\\
+	\indent\indent \bsc{SQL} : On déclare un curseur pour requete (break si on rencontre un tuple \bsc{null})\\
+	\indent\indent\textbf{Tant que}(vrai) \textbf{faire}\\
+		\indent\indent\indent \bsc{SQL} : On avance le curseur et sauvegarde les valeurs dans nomRecette, evalRecette.	\\
+		\indent\indent\indent \textbf{ecrire}(nomRecette + " : " + evalRecette)\\
+	\indent\indent\textbf{Fin tant que}\\
+\indent\textbf{Fin}\\
+
+Nous utilisons donc la vue \bsc{Liste\_evaluation\_recette} pour cette fonctionnalité, mais nous ne l'avons pas créée spécifiquement pour celle-ci, puisqu'elle était donnée dans le schéma Entité-Association.
+
+% ......................................................................................................................................
+\subsection{Affichage des invités / à invités}
+% ......................................................................................................................................
+
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Chaine} nomPersonne, aInviterChaine \\
+	\indent\indent\textbf{Naturel} aInviter \\	
+	\indent\indent\textbf{Chaine} requete = "FOR SELECT nomPersonne, aInviter FROM LISTE\_A\_INVITER;"\\
+
+\textbf{Début}\\
+	\indent\indent \textbf{ecrire}("Personnes invitées / à inviter : ")\\
+	\indent\indent \bsc{SQL} : On déclare un curseur pour requete (break si on rencontre un tuple \bsc{null})\\
+	\indent\indent\textbf{Tant que}(vrai) \textbf{faire}\\
+		\indent\indent\indent \bsc{SQL} : On avance le curseur et sauvegarde les valeurs dans nomPersonne, aInviter.\\
+		\indent\indent\indent \textbf{Si} aInviter = 1 \textbf{alors}\\
+			\indent\indent\indent\indent aInviterChaine = "à inviter"\\
+		\indent\indent\indent \textbf{Sinon}\\
+			\indent\indent\indent\indent aInviterChaine = "déjà invité"\\
+		\indent\indent\indent \textbf{Finsi}\\
+		\indent\indent\indent \textbf{ecrire}(nomPersonne + " : " + aInviterChaine)\\
+	\indent\indent\textbf{Fin tant que}\\	
+\indent\textbf{Fin}\\	
+
+Nous avons donc eu à utiliser la vue \bsc{Liste\_a\_inviter} afin d'implémenter cette fonctionnalité. Cette vue utilise elle-même trois fonction \bsc{pl/pgsql} - aInviter(), nbInvit() et derniereInvit() - que nous allons donc expliciter ci-dessous.
+
+\subsubsection{\bsc{SMALLINT} aInviter(id \bsc{INTEGER})}
+
+Cette fonction prend l'id de la personne dont on veut compter les invitations. Elle exécute la requête \bsc{sql} suivante : \\
+
+	SELECT MAX(rp.dateEvenement) INTO laDate\\
+	\indent FROM REALISER\_POUR rp, PERSONNE p\\
+	\indent WHERE rp.idPers = p.idPers AND p.idPers = id;\\
+	
+Le résultat retourné est 1 (vrai) si laDate est null, 0 (faux) sinon. 
+
+\subsubsection{INTEGER nbInvit(id INTEGER)}
+
+Cette fonction prend l'id de la personne dont on veut compter les invitations. Elle exécute la requête \bsc{sql} suivante : \\
+
+SELECT count(DISTINCT dateEvenement) INTO resultat\\
+	\indent FROM REALISER\_POUR\\
+	\indent WHERE idPers = id;\\
+	
+Le résultat de cette requête est stocké dans le résultat de la fonction.
+
+\subsubsection{derniereInvit()}
+
+Pour obtenir la date de dernière invitation, nous exécutons simplement la requête suivante :\\
+
+	SELECT MAX(rp.dateEvenement) INTO resultat\\
+	\indent FROM REALISER\_POUR rp, PERSONNE p\\
+	\indent WHERE rp.idPers = p.idPers AND p.idPers = id;\\
+	
+La fonction retourne son résultat.
+% ......................................................................................................................................
+\subsection{Affichage de la liste des recettes réalisées pour une personne donnée}
+% ......................................................................................................................................
+
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Chaine} nomRecette\\
+	\indent\indent\textbf{Naturel} idRecette, idPersonne\\	
+\indent \indent \textbf{Chaine} requete = "SELECT idRec FROM REALISER\_POUR WHERE (idPers = :idPersonne)
+\indent\indent GROUP BY idRec;"\\
+
+\textbf{Début}\\
+	\indent\indent \textbf{écrire}("ID de la personne : "))\\
+	\indent \indent \textbf{lire}(idPersonne)\\
+	\indent\indent \bsc{SQL} : On déclare un curseur pour requete (break si on rencontre un tuple \bsc{null})\\
+	\indent\indent\textbf{Tant que}(vrai) \textbf{faire}\\
+		\indent\indent\indent \bsc{SQL} : On avance le curseur dans la table \bsc{realiser}\_\bsc{pour} et sauvegarde les valeurs dans nom-
+		\indent\indent\indent Recette\\
+	\indent\indent \indent \textbf{ecrire}(nomRecette)\\
+	\indent\indent\textbf{Fin tant que}\\	
+\indent\textbf{Fin}\\	
+
+
+
+
+% ......................................................................................................................................
+\subsection{Affichage de la liste des recettes avec un ingrédient interdit}
+% ......................................................................................................................................
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Chaine} nomIngredient, nomRecette\\
+	\indent\indent\textbf{Naturel} idRecette\\	
+\indent \indent \textbf{Chaine} requete = "SELECT idRec FROM CONTENIR EXCEPT SELECT idRec FROM CONTE-
+\indent\indent NIR WHERE (nom = :nomIngredient) GROUP BY idRec;"\\
+
+\textbf{Début}\\
+	\indent\indent \textbf{ecrire}("Ingrédient interdit : "))\\
+	\indent \indent obtenirLigne(nomIngredient, sizeof(nomIngredient))\\
+		\indent\indent \textbf{ecrire}("Recettes possibles : "))\\
+	\indent\indent \bsc{SQL} : On déclare un curseur pour requete (break si on rencontre un tuple \bsc{null})\\
+	\indent\indent\textbf{Tant que}(vrai) \textbf{faire}\\
+		\indent\indent\indent \bsc{SQL} : On avance le curseur dans la table \bsc{contenir} et sauvegarde les valeurs dans nomRecette\\
+	\indent\indent \indent \textbf{ecrire}(nomRecette)\\
+	\indent\indent\textbf{Fin tant que}\\	
+\indent\textbf{Fin}\\	
+
+
+
+% ......................................................................................................................................
+\subsection{Affichage de la liste des recettes avec un ingrédient obligatoire}
+% ......................................................................................................................................
+
+\textbf{Déclarations}\\
+	\indent\indent\textbf{Chaine} nomIngredient, nomRecette\\
+	\indent\indent\textbf{Naturel} idRecette\\	
+\indent \indent \textbf{Chaine} requete = "SELECT idRec FROM CONTENIR WHERE (nom = :nomIngredient) 
+\indent\indent GROUP BY idRec;"\\
+
+\textbf{Début}\\
+	\indent\indent \textbf{ecrire}("Ingrédient obligatoire : "))\\
+	\indent \indent obtenirLigne(nomIngredient, sizeof(nomIngredient))\\
+	\indent\indent \textbf{ecrire}("Recettes possibles : "))\\
+	\indent\indent \bsc{SQL} : On déclare un curseur pour requete (break si on rencontre un tuple \bsc{null})\\
+	\indent\indent\textbf{Tant que}(vrai) \textbf{faire}\\
+		\indent\indent\indent \bsc{SQL} : On avance le curseur dans la table \bsc{contenir} et sauvegarde les valeurs dans nomRecette\\
+	\indent\indent \indent \textbf{ecrire}(nomRecette)\\
+	\indent\indent\textbf{Fin tant que}\\	
+\indent\textbf{Fin}\\	
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Ce qui aurait pu être fait}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --------------------------------------------------------------------------------------------------------------------------------------
+\section{... et qui aurait du être fait}
+% --------------------------------------------------------------------------------------------------------------------------------------
+Nous aurions aimé implémenter la contrainte d'intégrité permettant de vérifier à chaque invitation de personne à une date donnée que les gens invités à cette même date aient bien le même menu prévu. Par manque de temps, nous avons dû mettre cette fonctionnalité de côté et avons préféré nous concentrer sur les fonctionnalités imposées par le cahier des charges.
+% --------------------------------------------------------------------------------------------------------------------------------------
+\section{... en plus}
+% --------------------------------------------------------------------------------------------------------------------------------------
+
+Afin d'améliorer notre application, nous aurions pu rendre son comportement plus complet et autonome à l'insertion de tuples. Par exemple, dans sa version actuelle l'ajout d'une recette dans la base, induit l'ajout d'ingrédients dans \bsc{Contenir} et, si un ingrédient n'est pas connu, l'ajout dans la table \bsc{Ingredient}. Dans ce cas, peut imaginer que l'application gère également l'ajout dans \bsc{Realiser\_pour}, en demandant pour qui et quand la recette a été réalisée.\\
+
+En plus des contraintes d'intégrité, nous aurions pu faire en sorte, si l'utilisateur rentre une valeur incohérente (ex : 'famille' au lieu de 'Famille' pour l'attribut typeLien), l'application boucle jusqu'à ce que la valeur entrée soit cohérente, ou même qu'elle tente de reconnaître elle-même la bonne valeur à entrer. Cependant, une fonctionnalité relève plus du codage en \bsc{C} que de la base de données, c'est pourquoi nous n'avons pas pris le temps de l'implémenter.\\
+
+Il aurait également pu être pertinent, à l'affichage des recettes pour une personne ou à la suppression d'une recette, de ne pas passer par l'attribut id \bsc{Serial} correspondant, puisqu'il est peu intuitif. Mais ni le nom d'une personne ni le titre d'une recette ne sont clé dans leur relation, il aurait fallut trouver une technique pour pouvoir s'en passer. Par manque de temps, nous avons décidé de ne pas nous	 pencher sur la question. \\
+
+Si nous avions eu plus de temps, nous aurions réglé le problème de mise à jour des tables \bsc{recette} et \bsc{ingredients} lors d'un ajout de recette dont l'un des ingrédients est mal renseigné. Ce qu'il se passe, c'est que lorsqu'on ajoute une recette , on ajoute également des ingrédients, et si les renseignements fournis sur ce dernier ne respectent pas les contraintes d'intégrité de la table, l'ajout de l'ingrédient est annulé mais la recette, elle, est bien insérée.\\
+
+On peut aussi imaginer faire en sorte de pouvoir exécuter les fichiers \textit{creation.sql} et \textit{suppression.sql} directement depuis l'application, cependant nous ne savions pas comment faire et ne nous sommes pas vraiment penchés sur la question puisque d'autres fonctionnalités plus importantes devaient être implémentées.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\chapter{Conclusion}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+En conclusion, nous sommes globalement satisfaits du résultat que nous avons produit. Nous avons réussi à respecter le cahier des charges dans les délais imposés. Les fonctionnalités demandées sont présentes et fonctionnelles. Cela dit, elles peuvent toujours être améliorées, mais cela n'était pas envisageable compte tenu du temps dont nous disposions.\\
+
+Ce projet est le premier projet de base de données que nous réalisons, et vient compléter les compétences acquises lors des travaux pratiques et dirigés dispensés en cours. C'est aussi le premier travail en base de données que nous réalisons de manière autonome ; en ce sens nous en sommes d'autant plus satisfaits. \\
+
+Il nous a notamment permis d'améliorer notre connaissance de la matière, en concrétisant les concepts vus en cours. Nous sommes aujourd'hui bien plus à l'aise qu'au début du projet pour manipuler les bases de données, mais aussi pour ce qui est du couplage \bsc{sql}/\bsc{c}. Nous avons dû réaliser nous-même des fonctions \bsc{pl/pgsl}, des triggers... Notions que nous avions alors principalement étudiées de manière théorique.\\
+
+La majeure partie de notre du travail ayant été effectuée pendant les vacances, nous avons eu à mettre en place un dépôt Git pour gérer les versions de fichiers. Bien que nous étions déjà familiarisés avec cette pratique, nous en avons profité pour prendre en main certaines techniques que nous ne maîtrisions pas, notamment la résolution des conflits. \\ 
+
+\end{document}

@@ -1,0 +1,465 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <postgresql/sqlca.h>
+#include <postgresql/9.3/server/postgres.h>
+#include <postgresql/pgtypes_date.h>
+
+EXEC SQL WHENEVER SQLERROR sqlprint;
+EXEC SQL WHENEVER SQLWARNING sqlprint;
+
+/* Nous utilisons cette fonction classique car scanf pose des problèmes avec les séparateurs */
+void obtenirLigne(char *buffer, unsigned int size) {
+	char c = getchar();
+	if(c != '\n') {
+		buffer[0] = c;
+		buffer++;
+	}
+	if(!fgets(buffer, size, stdin))
+		return;
+	size = strlen(buffer);
+	if(size != 0 && buffer[size - 1] == '\n') {
+		buffer[size - 1] = '\0';
+	} else {
+		//On ignore les caractères suivants
+		while(getchar() != '\n');
+	}
+}
+
+void afficherLigne() {
+	unsigned int i;
+	for(i = 0; i < 70; i++)
+		printf("=");
+}
+
+void afficherEcranTitre() {
+	printf("\n\t");
+	afficherLigne();
+	printf("\n\t\tBienvenue dans l'application de gestion des recettes !");
+	printf("\n\t");
+	afficherLigne();
+	printf("\n");
+}
+
+void afficherMenu() {
+	printf("\n\n\t");
+	afficherLigne();
+	printf("\n\t\t\033[34;01m0-\033[00m Ajouter une personne\n");
+	printf("\t\t\033[34;01m1-\033[00m Ajouter une recette\n");
+	printf("\t\t\033[34;01m2-\033[00m Supprimer une recette\n");
+	printf("\t\t\033[34;01m3-\033[00m Afficher les ingrédients d'une recette\n");
+	printf("\t\t\033[34;01m4-\033[00m Afficher l'évaluation des recettes\n");
+	printf("\t\t\033[34;01m5-\033[00m Afficher les personnes invitées / à inviter\n");
+	printf("\t\t\033[34;01m6-\033[00m Afficher la liste des recettes pour une personne\n");
+	printf("\t\t\033[34;01m7-\033[00m Afficher les recettes selon un ingrédient interdit\n");
+	printf("\t\t\033[34;01m8-\033[00m Afficher les recettes selon un ingrédient obligatoire\n");
+	printf("\t\t\033[34;01m9-\033[00m Sortir\n\t");
+	afficherLigne();
+	printf("\n\n\n\tQue voulez-vous faire ? ");
+}
+
+void connexion() {
+	EXEC SQL BEGIN DECLARE SECTION;	
+		char base[100];
+		char utilisateur[10] = "grtt10";
+		char pwd[10] = "grtt10";
+	EXEC SQL END DECLARE SECTION;
+
+	strcpy(base, "tcp:postgresql://asi-pg.insa-rouen.fr:5432/grtt10"); /* Normalement */
+
+	printf ("\n\n\tConnexion à la base : %s...\n", base);
+	EXEC SQL CONNECT TO :base USER :utilisateur USING :pwd;
+	if(sqlca.sqlcode >= 0)
+		printf("\t\033[32;01mConnexion à la base effectuée !\033[00m\n");
+	else {
+		printf("\t\033[31;01mProblème lors de la connexion à la base !\033[00m\n");
+		EXEC SQL ROLLBACK;	
+		return;
+	}
+}
+
+void deconnexion() {
+	printf ("\n\tDéconnexion...\n");
+	EXEC SQL DISCONNECT;
+	if(sqlca.sqlcode >= 0)
+		printf("\t\033[32;01mDéconnexion effectuée.\033[00m\n\n\n");
+	else {
+		printf("\t\033[31;01mProblème lors de la déconnexion !\033[00m\n");
+		EXEC SQL ROLLBACK;	
+		return;
+	}
+}
+
+void ajouterPersonne() {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char typeLien[20], nom[50], telephone[20];
+		const char* requete = "INSERT INTO PERSONNE (idPers, nom, typeLien, telephone) VALUES (DEFAULT, ?, ?, ?);";
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\n\tNom : ");
+	obtenirLigne(nom, sizeof(nom));
+	printf("\tType du lien (Ami, Famille ou Collegue) : ");
+	obtenirLigne(typeLien, sizeof(typeLien));
+	printf("\tN° de téléphone : ");
+	obtenirLigne(telephone, sizeof(telephone));
+
+	EXEC SQL PREPARE RequeteAjouterPersonne FROM :requete;
+	EXEC SQL EXECUTE RequeteAjouterPersonne USING :nom, :typeLien, :telephone;
+	if(sqlca.sqlcode >= 0)
+		printf("\t\033[32;01mPersonne ajoutée !\033[00m\n");
+	else {
+		printf("\t\033[31;01mProblème lors de l'ajout de la personne !\033[00m\n");
+		EXEC SQL ROLLBACK;	
+		return;
+	}	
+ 	EXEC SQL COMMIT;
+	EXEC SQL DEALLOCATE PREPARE RequeteAjouterPersonne;
+}
+
+void ajouterIngredient(char nomIngredient[50], char lUnite[20]) {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char unite[20], nom[50];
+		char description[200];
+		unsigned int prix;
+		const char* requete = "INSERT INTO INGREDIENT (nom, unite, description, prix) VALUES (?, ?, ?, ?);";
+	EXEC SQL END DECLARE SECTION;
+
+	strcpy(nom, nomIngredient);
+	strcpy(unite, lUnite);
+
+	printf("\tDescription : ");
+	obtenirLigne(description, sizeof(description));
+	printf("\tPrix : ");
+	scanf("%d", &prix);
+
+	EXEC SQL PREPARE RequeteAjouterIngredient FROM :requete;
+	EXEC SQL EXECUTE RequeteAjouterIngredient USING :nom, :unite, :description, :prix;
+	if(sqlca.sqlcode >= 0)
+		printf("\t\033[32;01mIngrédient ajouté !\033[00m\n");
+	else {
+		printf("\t\033[31;01mProblème lors de l'ajout de l'ingrédient !\033[00m\n");
+		EXEC SQL ROLLBACK;
+		return;
+	}
+	EXEC SQL COMMIT;
+	EXEC SQL DEALLOCATE PREPARE RequeteAjouterIngredient;
+}
+
+void ajouterRecette() {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char titre[50], type[20], description[300], nomIngredient[50], unite[20];
+		char continuer[2];
+		float quantite;
+		unsigned int tpsPrep, tpsCuis, note, idRecette;
+		unsigned int i = 0;
+		unsigned int nb = 0;
+		const char* requete1 = "INSERT INTO RECETTE (idRec, titre, type, description, tempsPreparation, tempsCuisson, note) VALUES (DEFAULT, ?, ?, ?, ?, ?, ?);";
+		const char* requete2 = "INSERT INTO CONTENIR (quantite, unite, nom, idRec) VALUES (?, ?, ?, ?);";
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\n\tTitre : ");
+	obtenirLigne(titre, sizeof(titre));
+	printf("\tType (Entree, Plat, Dessert ou Amuse-gueule) : ");
+	obtenirLigne(type, sizeof(type));
+	printf("\tDescription : ");
+	obtenirLigne(description, sizeof(description));
+	printf("\tTemps de préparation : ");
+	scanf("%d", &tpsPrep);
+	printf("\tTemps de cuisson : ");
+	scanf("%d", &tpsCuis);
+	printf("\tNote : ");
+	scanf("%d", &note);
+
+	EXEC SQL PREPARE RequeteAjouterRecette FROM :requete1;
+	EXEC SQL EXECUTE RequeteAjouterRecette USING :titre, :type, :description, :tpsPrep, :tpsCuis, :note;
+	if(sqlca.sqlcode >= 0)
+		printf("\t\033[32;01mRecette ajoutée !\033[00m Ajout des ingrédients...\n");
+	else {
+		printf("\t\033[31;01mProblème lors de l'ajout de la recette !\033[00m\n");
+		EXEC SQL ROLLBACK;	
+		return;
+	}
+	EXEC SQL PREPARE RequeteAjouterContenir FROM :requete2;
+
+	EXEC SQL SELECT idRec INTO :idRecette FROM RECETTE WHERE (titre = :titre);
+
+	while(continuer[0] != 'n') {
+		i++;
+		printf("\n\tIngredient %d : ", i);
+		obtenirLigne(nomIngredient, sizeof(nomIngredient));
+		printf("\tUnité (unite, litre, kilo ou 100 grammes) : ");
+		obtenirLigne(unite, sizeof(unite));
+		printf("\tQuantité : ");
+		scanf("%f", &quantite);
+
+		/* Si l'ingrédient n'existe pas encore dans la table INGREDIENT */
+		EXEC SQL SELECT COUNT(*) INTO :nb FROM INGREDIENT WHERE (nom = :nomIngredient);
+		if(nb < 1) {
+			printf("\t\033[31;01mIngrédient inconnu !\033[00m Ajout dans la base...\n");
+			ajouterIngredient(nomIngredient, unite); 
+		}
+
+		EXEC SQL EXECUTE RequeteAjouterContenir USING :quantite, :unite, :nomIngredient, :idRecette;
+		if(sqlca.sqlcode >= 0)
+			printf("\t\033[32;01mTable CONTENIR mise à jour !\033[00m\n");
+		else {
+			printf("\t\033[31;01m\nProblème lors de la mise à jour de la table CONTENIR !\033[00m\n");
+			EXEC SQL ROLLBACK;
+			return;
+		}	
+
+		printf("\tNouvel ingrédient ? (o/n) : ");
+		obtenirLigne(continuer, sizeof(continuer));
+	}
+	continuer[0] = 'y';
+
+	EXEC SQL COMMIT;
+	EXEC SQL DEALLOCATE PREPARE RequeteAjouterRecette;
+	EXEC SQL DEALLOCATE PREPARE RequeteAjouterContenir;
+}
+
+void supprimerRecette() {
+	EXEC SQL BEGIN DECLARE SECTION;
+		unsigned int id, nb;
+		const char* requete = "DELETE FROM RECETTE WHERE idRec = ?;";
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\tID de la recette à supprimer : ");
+	scanf("%d", &id);
+
+	/* Erreur si la recette n'existe pas */
+	EXEC SQL SELECT COUNT(*) INTO :nb FROM RECETTE WHERE (idRec = :id);
+	if(nb == 0)
+		printf("\t\033[31;01mRecette inexistante !\033[00m\n");
+	else {				
+		EXEC SQL PREPARE RequeteSupprimerRecette FROM :requete;
+		EXEC SQL EXECUTE RequeteSupprimerRecette USING :id;
+		if(sqlca.sqlcode >= 0)
+			printf("\t\033[32;01mRecette supprimée !\033[00m\n");
+		else {
+			printf("\t\033[31;01mProblème lors de la supression de la recette !\033[00m\n");
+			EXEC SQL ROLLBACK;
+			return;
+		}	
+ 		EXEC SQL COMMIT;
+		EXEC SQL DEALLOCATE PREPARE RequeteSupprimerRecette;
+	}	
+}
+
+void afficherIngredients() {
+	EXEC SQL BEGIN DECLARE SECTION;
+		unsigned int idRecette;
+		char nomIngredient[50];
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\tID de la recette : ");
+	scanf("%d", &idRecette);
+
+	EXEC SQL DECLARE curseur CURSOR FOR SELECT nom FROM CONTENIR WHERE idrec = :idRecette;
+	EXEC SQL OPEN curseur ;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+	
+	printf("\n\tIngredients de la recette %d :\n", idRecette);
+
+	while(1) {
+		EXEC SQL FETCH curseur INTO :nomIngredient;
+		printf ("\n\t%s", nomIngredient);
+	} 
+	printf("\n");
+
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL CLOSE curseur;
+	EXEC SQL COMMIT;
+}
+
+void afficherEvaluationRecettes() {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char nomRecette[50];
+		char evalRecette[10];
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\n\tListe d'appreciation des recettes : \n");
+
+	EXEC SQL DECLARE curseur2 CURSOR FOR SELECT titre, appreciation FROM LISTE_EVALUATION_RECETTE;
+	EXEC SQL OPEN curseur2 ;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+
+	while (1) {
+		EXEC SQL FETCH curseur2 INTO :nomRecette , :evalRecette;
+		printf ("\n\t%s : %s",nomRecette, evalRecette);
+	}
+
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL CLOSE curseur2;
+	EXEC SQL COMMIT;
+}
+
+void afficherPersonnesAInviter() {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char nomPersonne[50], aInviterChaine[20];
+		unsigned int aInviter;
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\n\tPersonnes invitées / à inviter : \n");
+
+	EXEC SQL DECLARE curseur3 CURSOR FOR SELECT nomPersonne, aInviter FROM LISTE_A_INVITER;
+	EXEC SQL OPEN curseur3 ;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+
+	while (1) {
+		EXEC SQL FETCH curseur3 INTO :nomPersonne , :aInviter;
+		if(aInviter == 1)
+			strcpy(aInviterChaine, "à inviter");
+		else
+			strcpy(aInviterChaine, "déjà invité"); 
+		printf ("\n\t%s : %s", nomPersonne, aInviterChaine);
+	}
+
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL CLOSE curseur3;
+	EXEC SQL COMMIT;
+}
+ 
+void afficherRecettePourUnePersonne() { 
+	EXEC SQL BEGIN DECLARE SECTION;
+		char nomRecette[50];
+		unsigned int idRecette, idPersonne;
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\tID de la personne : ");
+	scanf("%d", &idPersonne);
+	printf("\n\tRecette(s) déjà servie(s) : \n");
+
+	EXEC SQL DECLARE curseur4 CURSOR FOR SELECT idRec FROM REALISER_POUR WHERE (idPers = :idPersonne) GROUP BY idRec;
+	EXEC SQL OPEN curseur4;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+
+	while (1) {
+		EXEC SQL FETCH curseur4 INTO :idRecette;
+		EXEC SQL SELECT titre INTO :nomRecette FROM RECETTE WHERE idRec = :idRecette;
+		printf ("\n\t%s", nomRecette);
+	}
+
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL CLOSE curseur4;
+	EXEC SQL COMMIT;
+}
+
+void afficherRecettesIngredientInterdit() {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char nomIngredient[50], nomRecette[50];
+		unsigned int idRecette;
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\tIngrédient interdit : ");
+	obtenirLigne(nomIngredient, sizeof(nomIngredient));
+	printf("\n\tRecettes possibles : ");
+
+	EXEC SQL DECLARE curseur5 CURSOR FOR SELECT idRec FROM CONTENIR EXCEPT SELECT idRec FROM CONTENIR WHERE (nom = :nomIngredient) GROUP BY idRec;
+	EXEC SQL OPEN curseur5;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+
+	while (1) {
+		EXEC SQL FETCH curseur5 INTO :idRecette;
+		EXEC SQL SELECT titre INTO :nomRecette FROM RECETTE WHERE idRec = :idRecette;
+		printf ("\n\t%s", nomRecette);
+	}
+
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL CLOSE curseur5;
+	EXEC SQL COMMIT;
+}
+
+void afficherRecettesIngredientObligatoire() {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char nomIngredient[50], nomRecette[50];
+		unsigned int idRecette;
+	EXEC SQL END DECLARE SECTION;
+
+	printf("\tIngrédient obligatoire : ");
+	obtenirLigne(nomIngredient, sizeof(nomIngredient));
+	printf("\n\tRecettes possibles : ");
+
+	EXEC SQL DECLARE curseur6 CURSOR FOR SELECT idRec FROM CONTENIR WHERE (nom = :nomIngredient) GROUP BY idRec;
+	EXEC SQL OPEN curseur6;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+
+	while (1) {
+		EXEC SQL FETCH curseur6 INTO :idRecette;
+		EXEC SQL SELECT titre INTO :nomRecette FROM RECETTE WHERE idRec = :idRecette;
+		printf ("\n\t%s", nomRecette);
+	}
+
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL CLOSE curseur6;
+	EXEC SQL COMMIT;
+}
+
+int main(int argc, char* argv[]) {
+
+	/* Déclarations */
+	char choix[2];
+
+	connexion();
+
+	//printf("%s", ecranTitre);
+	afficherEcranTitre();
+
+	/* Menu */
+	do {
+		afficherMenu();
+ 		obtenirLigne(choix, sizeof(choix));
+
+ 		switch(choix[0]) {
+ 			case '0': 
+				ajouterPersonne();
+ 			break;
+
+ 			case '1': 
+				ajouterRecette();
+ 			break;
+
+ 			case '2': 
+ 				supprimerRecette();
+ 			break;
+
+ 			case '3': 
+				afficherIngredients();
+ 			break;
+
+ 			case '4': 
+ 				afficherEvaluationRecettes();
+ 			break;
+
+ 			case '5': 
+ 				afficherPersonnesAInviter();
+ 			break;
+
+ 			case '6': 
+ 				afficherRecettePourUnePersonne();
+ 			break;
+
+ 			case '7': 
+ 				afficherRecettesIngredientInterdit();
+ 			break;
+
+ 			case '8': 
+ 				afficherRecettesIngredientObligatoire();
+ 			break;
+
+ 			case '9': break;
+
+ 			default: 
+ 				printf("\tMauvaise entrée !\n"); 
+ 			break;
+ 		}
+
+ 		/* Mise à jour */
+
+	} while(choix[0] != '9');
+
+	deconnexion();
+	return EXIT_SUCCESS;
+}

@@ -1,0 +1,16 @@
+#!/bin/bash
+# Fonctionnement : ./compile (pas d'argument)
+
+echo "Precompilation"
+#ecpg $1.pgc
+ecpg appli.pgc
+
+echo "Compilation"
+#gcc -g -Wall -c -I/usr/include/postgresql -I/usr/include/postgresql/9.3/server $1.c
+gcc -g -Wall -c -I/usr/include/postgresql -I/usr/include/postgresql/9.3/server appli.c
+
+echo "Edition des liens"
+#gcc -o $1 $1.o -L/usr/lib -lpq -lpgtypes -lecpg
+gcc -o BD_Recettes appli.o -L/usr/lib -lpq -lpgtypes -lecpg
+
+exit
